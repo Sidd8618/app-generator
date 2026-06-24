@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>App Generator Pipeline</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0f0f11; color: #e2e2e2; min-height: 100vh; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 40px 24px; }
+  h1 { font-size: 26px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .subtitle { color: #888; margin-bottom: 32px; font-size: 14px; }
+  textarea { width: 100%; background: #1a1a1f; border: 1px solid #333;
+    border-radius: 10px; color: #e2e2e2; font-size: 15px;
+    padding: 16px; resize: vertical; min-height: 110px; }
+  textarea:focus { outline: none; border-color: #7c6ae8; }
+  button { background: #7c6ae8; color: #fff; border: none; border-radius: 8px;
+    padding: 12px 28px; font-size: 15px; cursor: pointer; margin-top: 12px; }
+  button:hover { background: #6b5ad4; }
+  button:disabled { background: #333; cursor: not-allowed; }
+  .stages { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin: 28px 0; }
+  .stage { background: #1a1a1f; border: 1px solid #2a2a2f;
+    border-radius: 8px; padding: 14px; transition: border-color 0.3s; }
+  .stage.active { border-color: #7c6ae8; background: #1e1a2e; }
+  .stage.done   { border-color: #2ea043; background: #0d1f12; }
+  .stage-num  { font-size: 11px; color: #666; margin-bottom: 4px; }
+  .stage-name { font-size: 14px; font-weight: 500; }
+  .output { background: #1a1a1f; border: 1px solid #2a2a2f;
+    border-radius: 10px; padding: 20px; margin-top: 20px; }
+  .output h2 { font-size: 15px; color: #aaa; margin-bottom: 12px; }
+  .meta { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .meta span { background: #222; border: 1px solid #333; padding: 4px 12px;
+    border-radius: 20px; font-size: 12px; color: #aaa; }
+  pre { font-size: 13px; overflow-x: auto; white-space: pre-wrap;
+    max-height: 500px; overflow-y: auto; color: #b5cef0; line-height: 1.6; }
+  .error { color: #f87171; background: #1a0808; border: 1px solid #5a1a1a;
+    border-radius: 8px; padding: 14px; margin-top: 16px; font-size: 14px; }
+  .assumptions { background: #1a1a10; border: 1px solid #3a3a20;
+    border-radius: 8px; padding: 14px; margin-top: 16px; }
+  .assumptions h3 { font-size: 13px; color: #aaa; margin-bottom: 8px; }
+  .assumptions ul { padding-left: 18px; font-size: 13px; color: #888; line-height: 1.8; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>App Generation Pipeline</h1>
+  <p class="subtitle">Natural language → validated app config in 4 AI stages</p>
+
+  <textarea id="prompt"
+    placeholder='Example: "Build a CRM with login, contacts, dashboard, role-based access, and analytics for admins"'></textarea>
+  <button id="btn" onclick="generate()">Generate App Config</button>
+
+  <div class="stages">
+    <div class="stage" id="s1">
+      <div class="stage-num">Stage 1</div>
+      <div class="stage-name">Intent extraction</div>
+    </div>
+    <div class="stage" id="s2">
+      <div class="stage-num">Stage 2</div>
+      <div class="stage-name">System design</div>
+    </div>
+    <div class="stage" id="s3">
+      <div class="stage-num">Stage 3</div>
+      <div class="stage-name">Schema generation</div>
+    </div>
+    <div class="stage" id="s4">
+      <div class="stage-num">Stage 4</div>
+      <div class="stage-name">Validate + repair</div>
+    </div>
+  </div>
+
+  <div id="result"></div>
+</div>
+
+<script>
+async function generate() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) return alert('Please enter a prompt first');
+
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  document.getElementById('result').innerHTML = '';
+
+  const stages = ['s1','s2','s3','s4'];
+  stages.forEach(id => document.getElementById(id).className = 'stage');
+
+  let si = 0;
+  const interval = setInterval(() => {
+    if (si > 0) document.getElementById(stages[si - 1]).className = 'stage done';
+    if (si < stages.length) document.getElementById(stages[si]).className = 'stage active';
+    si++;
+    if (si > stages.length) clearInterval(interval);
+  }, 2500);
+
+  try {
+    const res = await fetch('/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    clearInterval(interval);
+    stages.forEach(id => document.getElementById(id).className = 'stage done');
+
+    if (!data.success) throw new Error(data.error);
+
+    const assumptions = data.pipeline_stages?.intent?.assumptions || [];
+    const assumptionsHTML = assumptions.length > 0 ? `
+      <div class="assumptions">
+        <h3>Assumptions made for your prompt</h3>
+        <ul>${assumptions.map(a => `<li>${a}</li>`).join('')}</ul>
+      </div>` : '';
+
+    document.getElementById('result').innerHTML = `
+      <div class="output">
+        <div class="meta">
+          <span>⏱ ${data.latency_ms}ms</span>
+          <span>🔄 ${data.validation_report.attempts} validation attempt(s)</span>
+          <span>🔧 ${data.validation_report.repairs_made.length} repair(s) made</span>
+        </div>
+        ${assumptionsHTML}
+        <h2 style="margin-top:16px">Final validated schema</h2>
+        <pre>${JSON.stringify(data.final_schema, null, 2)}</pre>
+      </div>`;
+  } catch (err) {
+    clearInterval(interval);
+    document.getElementById('result').innerHTML =
+      `<div class="error">Error: ${err.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate App Config';
+  }
+}
+</script>
+</body>
+</html>
