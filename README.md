@@ -3,7 +3,7 @@
 A multi-stage AI pipeline that converts natural language into a complete, validated app configuration — like a compiler for software generation.
 
 ## Live Demo
-[Click here to try it](https://app-generator-xxxx.onrender.com)
+Click here to try it :) -- (https://app-generator-nf7e.onrender.com)
 
 ## How It Works
 
