@@ -1,7 +1,9 @@
 import Groq from 'groq-sdk';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const client = new Groq({ 
-  apiKey: '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'
+  apiKey: process.env.GROQ_API_KEY
 });
 
 export async function callLLM(systemPrompt, userMessage, temperature = 0.3) {
@@ -16,3 +18,4 @@ export async function callLLM(systemPrompt, userMessage, temperature = 0.3) {
   });
   return JSON.parse(response.choices[0].message.content);
 }
+
